@@ -85,9 +85,11 @@ function noteRateLimit(o) {
   const i = o && o.rate_limit_info;
   if (!i || !i.rateLimitType) return;
   const prev = usage[i.rateLimitType] || {};
+  if (typeof i.utilization !== 'number') usageAsked = 0;
   usage[i.rateLimitType] = {
     status: i.status || prev.status || 'allowed',
-    utilization: typeof i.utilization === 'number' ? i.utilization : (prev.resetsAt === i.resetsAt ? prev.utilization : undefined),
+    // no number in this update: keep the last one (same window, or from /usage, which is asked again right away)
+    utilization: typeof i.utilization === 'number' ? i.utilization : (prev.resetsAt === i.resetsAt || prev.resetsAt == null ? prev.utilization : undefined),
     resetsAt: i.resetsAt || prev.resetsAt || null,
     usingOverage: !!i.isUsingOverage,
     updated: Date.now(),
@@ -273,13 +275,16 @@ function localPath(p) {
   return t && fs.existsSync(t) ? t : p;
 }
 
+// Chats run in the system Temp folder were made by other programs calling Claude Code (not by you), so they
+// stay out of the list; the files are left alone. (Off when home itself is in Temp, as in the tests.)
+const HIDE_TEMP = !isInside(os.homedir(), os.tmpdir());
 async function listSessions() {
   const files = await listSessionFiles();
   const infos = [];
   // modest concurrency so huge histories don't spike memory
   for (let i = 0; i < files.length; i += 16) {
     const batch = await Promise.all(files.slice(i, i + 16).map(scanFile));
-    for (const b of batch) if (b && !isInside(b.cwd, APP_DIR)) infos.push(decorate(b));
+    for (const b of batch) if (b && !isInside(b.cwd, APP_DIR) && !(HIDE_TEMP && isInside(b.cwd, os.tmpdir()))) infos.push(decorate(b));
   }
   infos.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
   return infos;
@@ -1517,7 +1522,7 @@ function setAppHooks(h) { appHooks = h || {}; }
 const remote = require('./remote');
 remote.init({ APP_DIR, PUBLIC_DIR, route, send, serveStatic });
 
-module.exports = { isRemoteEnabled: () => remote.isEnabled(), start, stopAll, setAppHooks, _internal: { trashUsageChecks, officeTextFile, apiContent, attachBlock, buildContext, getProject, listSessions, store, translateHome, folderHere, sameNameFolders } };
+module.exports = { isRemoteEnabled: () => remote.isEnabled(), start, stopAll, setAppHooks, _internal: { noteRateLimit, trashUsageChecks, officeTextFile, apiContent, attachBlock, buildContext, getProject, listSessions, store, translateHome, folderHere, sameNameFolders } };
 
 // Run directly (`node server.js`): serve and open the default browser.
 if (require.main === module) {

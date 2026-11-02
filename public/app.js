@@ -884,6 +884,7 @@ function setView(v) {
   const k = draftKey(v);
   $('#input').value = S.drafts[k] || '';
   S.pending = S.pendingFor[k] || [];
+  delete S.pendingFor[k]; // saved again on the way out; a kept copy would bring back files already sent
   if (v.id && S.queues[v.id]) v.queue = S.queues[v.id];
   autoGrow(); renderAttachRow(); renderQueue();
 }

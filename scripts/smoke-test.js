@@ -186,6 +186,10 @@ const { start } = require('../server.js');
   fs.mkdirSync(usageDir, { recursive: true });
   fs.writeFileSync(path.join(usageDir, 'usage-check.jsonl'), JSON.stringify({ type: 'user', message: { role: 'user', content: '<command-name>/usage</command-name>' } }) + '\n');
   assert.strictEqual(await _internal.trashUsageChecks(), 1, 'moves the usage-check chats');
+  // usage updates without a number keep the last percentage (the ring showed "OK" instead of 41%)
+  _internal.noteRateLimit({ rate_limit_info: { rateLimitType: 'five_hour', status: 'allowed', utilization: 0.41 } });
+  _internal.noteRateLimit({ rate_limit_info: { rateLimitType: 'five_hour', status: 'allowed', resetsAt: Date.now() / 1000 + 3600 } });
+  assert.strictEqual((await get('/api/usage')).limits.five_hour.utilization, 0.41, 'keeps the session percentage when an update has none');
   assert.ok(fs.existsSync(path.join(tmp, '.roundtable', 'trash', 'usage-checks', 'usage-check.jsonl')) && fs.existsSync(path.join(projDir, id + '.jsonl')), 'into the trash, leaving real chats alone');
   // the text is saved next to the upload, and each kind of chat is pointed at it
   const upDir = path.join(tmp, '.roundtable', 'uploads', 'office-test');
