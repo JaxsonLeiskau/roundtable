@@ -223,7 +223,8 @@ const { start } = require('../server.js');
   const rpost = b => fetch(base + '/api/remote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then(r => r.json());
   assert.ok(/password first/i.test((await rpost({ enabled: true })).error), 'needs a password before turning on');
   assert.ok(/8 characters/.test((await rpost({ password: 'short' })).error), 'refuses short passwords');
-  const rport = 3600 + Math.floor(Math.random() * 300);
+  // a port the system says is free (a random one was sometimes already taken on Windows CI)
+  const rport = await new Promise(res => { const s = require('net').createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); });
   const on = await rpost({ password: 'correct horse', port: rport, enabled: true });
   assert.ok(on.enabled && on.running, 'phone access turns on: ' + JSON.stringify(on));
   const rbase = `http://127.0.0.1:${rport}`;
